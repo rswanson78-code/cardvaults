@@ -1,0 +1,50 @@
+[debug] [2026-03-25T15:45:45.689Z] ----------------------------------------------------------------------
+[debug] [2026-03-25T15:45:45.691Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\rswanson\.gemini\antigravity\scratch\card-vault\node_modules\firebase-tools\lib\bin\firebase.js hosting:sites:create card-vault-site-2026 --project studio-6132422334-d26a3
+[debug] [2026-03-25T15:45:45.691Z] CLI Version:   15.11.0
+[debug] [2026-03-25T15:45:45.691Z] Platform:      win32
+[debug] [2026-03-25T15:45:45.691Z] Node Version:  v24.14.0
+[debug] [2026-03-25T15:45:45.691Z] Time:          Wed Mar 25 2026 10:45:45 GMT-0500 (Central Daylight Time)
+[debug] [2026-03-25T15:45:45.691Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-25T15:45:45.866Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-25T15:45:45.866Z] > authorizing via signed-in user (rswanson78@gmail.com)
+[debug] [2026-03-25T15:45:45.866Z] [iam] checking project studio-6132422334-d26a3 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-03-25T15:45:45.867Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:45:45.867Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:45:45.868Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3:testIamPermissions [none]
+[debug] [2026-03-25T15:45:45.868Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3:testIamPermissions  x-goog-user-project=studio-6132422334-d26a3
+[debug] [2026-03-25T15:45:45.868Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-03-25T15:45:45.995Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3:testIamPermissions 200
+[debug] [2026-03-25T15:45:45.995Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-03-25T15:45:45.997Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:45:45.997Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:45:45.997Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3 [none]
+[debug] [2026-03-25T15:45:46.078Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3 200
+[debug] [2026-03-25T15:45:46.078Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/studio-6132422334-d26a3 {"projectNumber":"489557408741","projectId":"studio-6132422334-d26a3","lifecycleState":"ACTIVE","name":"Card Vault","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-03-14T12:54:49.776926Z"}
+[debug] [2026-03-25T15:45:46.079Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:45:46.079Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:45:46.080Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites siteId=card-vault-site-2026&validateOnly=true
+[debug] [2026-03-25T15:45:46.080Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites {"appId":""}
+[debug] [2026-03-25T15:45:46.744Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites 409
+[debug] [2026-03-25T15:45:46.745Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites {"error":{"code":409,"message":"Channel `projects/489557408741/sites/studio-6132422334-d26a3/channels/live` already exists.","status":"ALREADY_EXISTS"}}
+[warn] !  Request to https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites?siteId=card-vault-site-2026&validateOnly=true had HTTP Error: 409, Channel `projects/489557408741/sites/studio-6132422334-d26a3/channels/live` already exists. 
+[debug] [2026-03-25T15:46:04.845Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:46:04.845Z] Checked if tokens are valid: true, expires at: 1774456826742
+[debug] [2026-03-25T15:46:04.846Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites siteId=card-vault-site-t2026&validateOnly=true
+[debug] [2026-03-25T15:46:04.846Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites {"appId":""}
+[debug] [2026-03-25T15:46:05.359Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites 409
+[debug] [2026-03-25T15:46:05.359Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites {"error":{"code":409,"message":"Channel `projects/489557408741/sites/studio-6132422334-d26a3/channels/live` already exists.","status":"ALREADY_EXISTS"}}
+[warn] !  Request to https://firebasehosting.googleapis.com/v1beta1/projects/489557408741/sites?siteId=card-vault-site-t2026&validateOnly=true had HTTP Error: 409, Channel `projects/489557408741/sites/studio-6132422334-d26a3/channels/live` already exists. 
+[debug] [2026-03-25T15:46:22.432Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (C:\Users\rswanson\.gemini\antigravity\scratch\card-vault\node_modules\@inquirer\core\dist\commonjs\lib\create-prompt.js:101:37)
+    at Interface.emit (node:events:508:28)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:520:35)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:563:12)
+[error] 
+[error] Error: An unexpected error has occurred.
