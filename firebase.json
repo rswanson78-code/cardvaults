@@ -1,6 +1,5 @@
 {
   "hosting": {
-    "site": "studio-6132422334-d26a3-d9c97",
     "source": ".",
     "ignore": [
       "firebase.json",
@@ -8,7 +7,10 @@
       "**/node_modules/**"
     ],
     "frameworksBackend": {
-      "region": "us-central1"
+      "region": "us-east1"
     }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   }
 }

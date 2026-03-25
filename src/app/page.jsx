@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState, useEffect, useRef } from "react";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -9,12 +9,12 @@ const GRADING_SCALES = {
 };
 const RAW_CONDITIONS = ["Gem Mint","Mint","Near Mint-Mint","Near Mint","Excellent-Mint","Excellent","Very Good-Excellent","Very Good","Good","Fair","Poor"];
 const FOOTBALL_BRANDS = ["Panini","Topps","Upper Deck","Leaf","Sage","SAGE Hit","Wild Card","Press Pass","Other"];
-const POKEMON_BRANDS = ["The PokÃ©mon Company","Wizards of the Coast","Other"];
+const POKEMON_BRANDS = ["The Pokémon Company","Wizards of the Coast","Other"];
 const OTHER_BRANDS = ["Panini","Topps","Upper Deck","Leaf","Fleer","Donruss","Bowman","Other"];
 const FOOTBALL_SETS = ["Prizm","Mosaic","Select","Optic","Donruss","Playbook","Spectra","Immaculate","National Treasures","Contenders","Phoenix","Absolute","Chronicles","Score","Prestige","Certified","Crown Royale","Obsidian","Chrome","Bowman Chrome","Stadium Club","Other"];
 const POKEMON_SETS = ["Obsidian Flames","Paldea Evolved","Scarlet & Violet","Crown Zenith","Silver Tempest","Lost Origin","Astral Radiance","Brilliant Stars","Fusion Strike","Evolving Skies","Chilling Reign","Battle Styles","Vivid Voltage","Champion's Path","Hidden Fates","Other"];
 const OTHER_SETS = ["Chrome","Prizm","Mosaic","Select","Optic","Donruss","Bowman","Topps Series 1","Topps Series 2","Topps Update","Stadium Club","Other"];
-const CATEGORIES = ["Football","PokÃ©mon","Basketball","Baseball","Soccer","Hockey","Other"];
+const CATEGORIES = ["Football","Pokémon","Basketball","Baseball","Soccer","Hockey","Other"];
 
 const DEFAULT_CARD = {
   id: "", owner: "", category: "Football", playerName: "", brand: "", set: "", variation: "",
@@ -44,7 +44,7 @@ const scanCardWithAI = async (frontImg, backImg, category) => {
     const images = [];
     if (frontImg) { const b = frontImg.split(",")[1]; const m = frontImg.split(";")[0].split(":")[1] || "image/jpeg"; images.push({ type: "image", source: { type: "base64", media_type: m, data: b } }); images.push({ type: "text", text: "Above is the FRONT of the card." }); }
     if (backImg) { const b = backImg.split(",")[1]; const m = backImg.split(";")[0].split(":")[1] || "image/jpeg"; images.push({ type: "image", source: { type: "base64", media_type: m, data: b } }); images.push({ type: "text", text: "Above is the BACK of the card." }); }
-    const prompt = `You are an expert ${category === "PokÃ©mon" ? "PokÃ©mon" : "sports"} card identifier. Analyze the card image(s) and extract information. Respond ONLY with a JSON object, no markdown, no backticks:\n{"playerName":"","brand":"","set":"","variation":"","year":"","cardNumber":"","serialNumber":"","estimatedCondition":""}\nIf you cannot determine a field, use empty string. Be specific.`;
+    const prompt = `You are an expert ${category === "Pokémon" ? "Pokémon" : "sports"} card identifier. Analyze the card image(s) and extract information. Respond ONLY with a JSON object, no markdown, no backticks:\n{"playerName":"","brand":"","set":"","variation":"","year":"","cardNumber":"","serialNumber":"","estimatedCondition":""}\nIf you cannot determine a field, use empty string. Be specific.`;
     const response = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category, prompt, images }) });
     const data = await response.json(); const text = data.content?.map(i => i.text || "").join("") || "";
     return JSON.parse(text.replace(/```json|```/g, "").trim());
@@ -145,8 +145,8 @@ export default function CardVault() {
   }, [profiles, cards, darkMode]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-  const getBrands = (cat) => cat === "PokÃ©mon" ? POKEMON_BRANDS : cat === "Football" ? FOOTBALL_BRANDS : OTHER_BRANDS;
-  const getSets = (cat) => cat === "PokÃ©mon" ? POKEMON_SETS : cat === "Football" ? FOOTBALL_SETS : OTHER_SETS;
+  const getBrands = (cat) => cat === "Pokémon" ? POKEMON_BRANDS : cat === "Football" ? FOOTBALL_BRANDS : OTHER_BRANDS;
+  const getSets = (cat) => cat === "Pokémon" ? POKEMON_SETS : cat === "Football" ? FOOTBALL_SETS : OTHER_SETS;
   const updateForm = (k, v) => setCardForm(p => ({ ...p, [k]: v }));
   const profileColor = (name) => PROFILE_COLORS[profiles.indexOf(name) % PROFILE_COLORS.length];
 
@@ -173,7 +173,7 @@ export default function CardVault() {
     if (result) {
       setCardForm(p => ({ ...p, playerName: result.playerName || p.playerName, brand: result.brand || p.brand, set: result.set || p.set, variation: result.variation || p.variation, year: result.year || p.year, cardNumber: result.cardNumber || p.cardNumber, serialNumber: result.serialNumber || p.serialNumber, rawCondition: result.estimatedCondition || p.rawCondition }));
       showToast("Card scanned! Review the details below.");
-    } else { showToast("Scan failed â€” fill in details manually."); }
+    } else { showToast("Scan failed — fill in details manually."); }
   };
 
   const handleSaveCard = () => {
@@ -234,7 +234,7 @@ export default function CardVault() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.playerName}</div>
-                  <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>{[card.year, card.brand, card.set].filter(Boolean).join(" Â· ")}</div>
+                  <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>{[card.year, card.brand, card.set].filter(Boolean).join(" · ")}</div>
                 </div>
                 {card.manualValue && <div style={{ background: t.accentBg, color: t.accent, padding: "3px 9px", borderRadius: 8, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(card.manualValue)}</div>}
               </div>
@@ -272,7 +272,7 @@ export default function CardVault() {
 
   const CardForm = ({ isEdit }) => (
     <div style={{ animation: "fadeIn 0.4s ease", paddingTop: 20 }}>
-      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isEdit ? "Edit Card" : "Add New Card"}{activeProfile && !isEdit ? ` â€” ${activeProfile}` : ""}</h2>
+      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isEdit ? "Edit Card" : "Add New Card"}{activeProfile && !isEdit ? ` — ${activeProfile}` : ""}</h2>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
         <ImageUpload label="Front of Card" image={cardForm.frontImage} onImage={img => updateForm("frontImage", img)} darkMode={darkMode} />
         <ImageUpload label="Back of Card" image={cardForm.backImage} onImage={img => updateForm("backImage", img)} darkMode={darkMode} />
@@ -280,13 +280,13 @@ export default function CardVault() {
       <button onClick={handleScan} disabled={scanning || (!cardForm.frontImage && !cardForm.backImage)} style={{ ...btnP, width: "100%", justifyContent: "center", marginBottom: 20, padding: "14px 20px", opacity: scanning || (!cardForm.frontImage && !cardForm.backImage) ? 0.5 : 1, borderRadius: 14, background: scanning ? t.textMuted : t.accent }}>
         <I name="scan" size={18} /> {scanning ? "Scanning Card..." : "AI Scan Card Details"}
       </button>
-      {scanning && <div style={{ textAlign: "center", padding: "0 0 16px", fontSize: 13, opacity: 0.5 }}>Analyzing with AI vision â€” a few seconds...</div>}
+      {scanning && <div style={{ textAlign: "center", padding: "0 0 16px", fontSize: 13, opacity: 0.5 }}>Analyzing with AI vision — a few seconds...</div>}
       <div style={{ display: "grid", gap: 14 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label style={lbl}>Owner *</label><select value={cardForm.owner} onChange={e => updateForm("owner", e.target.value)} style={{ ...inp, cursor: "pointer" }}><option value="">Select owner...</option>{profiles.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
           <div><label style={lbl}>Category</label><select value={cardForm.category} onChange={e => updateForm("category", e.target.value)} style={{ ...inp, cursor: "pointer" }}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
         </div>
-        <div><label style={lbl}>{cardForm.category === "PokÃ©mon" ? "PokÃ©mon Name *" : "Player Name *"}</label><input value={cardForm.playerName} onChange={e => updateForm("playerName", e.target.value)} placeholder={cardForm.category === "PokÃ©mon" ? "e.g. Charizard" : "e.g. Patrick Mahomes"} style={inp} /></div>
+        <div><label style={lbl}>{cardForm.category === "Pokémon" ? "Pokémon Name *" : "Player Name *"}</label><input value={cardForm.playerName} onChange={e => updateForm("playerName", e.target.value)} placeholder={cardForm.category === "Pokémon" ? "e.g. Charizard" : "e.g. Patrick Mahomes"} style={inp} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label style={lbl}>Brand</label><select value={cardForm.brand} onChange={e => updateForm("brand", e.target.value)} style={{ ...inp, cursor: "pointer" }}><option value="">Select...</option>{getBrands(cardForm.category).map(b => <option key={b} value={b}>{b}</option>)}</select></div>
           <div><label style={lbl}>Set</label><select value={cardForm.set} onChange={e => updateForm("set", e.target.value)} style={{ ...inp, cursor: "pointer" }}><option value="">Select...</option>{getSets(cardForm.category).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
@@ -321,7 +321,7 @@ export default function CardVault() {
             <a href={getValueUrl(cardForm, "ebay")} target="_blank" rel="noopener noreferrer" style={{ ...btnS, textDecoration: "none", color: t.text }}><I name="ext" size={14} /> eBay Sold</a>
             <a href={getValueUrl(cardForm, "130point")} target="_blank" rel="noopener noreferrer" style={{ ...btnS, textDecoration: "none", color: t.text }}><I name="ext" size={14} /> 130point</a>
           </div>
-          <p style={{ fontSize: 12, opacity: 0.4, marginTop: 8, marginBottom: 0 }}>Opens in new tab â€” enter value above after checking.</p>
+          <p style={{ fontSize: 12, opacity: 0.4, marginTop: 8, marginBottom: 0 }}>Opens in new tab — enter value above after checking.</p>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
           <button onClick={handleSaveCard} style={{ ...btnP, flex: 1, justifyContent: "center", padding: "14px 20px", borderRadius: 14 }}><I name="check" size={18} /> {isEdit ? "Save Changes" : "Add to Vault"}</button>
@@ -380,7 +380,7 @@ export default function CardVault() {
                         <div style={{ width: 40, height: 40, borderRadius: 12, background: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color }}>{name.charAt(0).toUpperCase()}</div>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: 18 }}>{name}</div>
-                          <div style={{ fontSize: 13, opacity: 0.5 }}>{stats.count} card{stats.count !== 1 ? "s" : ""}{stats.categories.length > 0 && ` Â· ${stats.categories.join(", ")}`}</div>
+                          <div style={{ fontSize: 13, opacity: 0.5 }}>{stats.count} card{stats.count !== 1 ? "s" : ""}{stats.categories.length > 0 && ` · ${stats.categories.join(", ")}`}</div>
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
@@ -431,8 +431,8 @@ export default function CardVault() {
                 )}
               </div>
               <button onClick={() => openAddCard(activeProfile)} style={{ ...btnP, width: "100%", justifyContent: "center", padding: "14px 20px", fontSize: 15, marginTop: 16, marginBottom: 16, borderRadius: 14 }}><I name="plus" size={18} /> Add Card for {activeProfile}</button>
-              <FilterBar />
-              <CardGrid cardList={contextCards} emptyMsg={`${activeProfile} hasn't added any cards yet.`} />
+              {FilterBar()}
+              {CardGrid({ cardList: contextCards, emptyMsg: `${activeProfile} hasn't added any cards yet.` })}
             </div>
           );
         })()}
@@ -444,13 +444,13 @@ export default function CardVault() {
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>All Cards ({cards.length})</h2>
               <button onClick={() => openAddCard("")} style={btnP}><I name="plus" size={16} /> Add Card</button>
             </div>
-            <FilterBar />
-            <CardGrid cardList={contextCards} emptyMsg="No cards match your filters." />
+            {FilterBar()}
+            {CardGrid({ cardList: contextCards, emptyMsg: "No cards match your filters." })}
           </div>
         )}
 
-        {view === "addCard" && <CardForm isEdit={false} />}
-        {view === "editCard" && <CardForm isEdit={true} />}
+        {view === "addCard" && CardForm({ isEdit: false })}
+        {view === "editCard" && CardForm({ isEdit: true })}
 
         {/* â•â•â• CARD DETAIL â•â•â• */}
         {view === "cardDetail" && selectedCard && (
@@ -463,7 +463,7 @@ export default function CardVault() {
             )}
             <div style={{ background: t.surface, borderRadius: 14, border: `1px solid ${t.border}`, padding: 20, marginBottom: 16, borderLeft: `4px solid ${profileColor(selectedCard.owner)}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-                <div><h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>{selectedCard.playerName}</h2><div style={{ fontSize: 14, opacity: 0.5, marginTop: 4 }}>{[selectedCard.year, selectedCard.brand, selectedCard.set].filter(Boolean).join(" Â· ")}</div></div>
+                <div><h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>{selectedCard.playerName}</h2><div style={{ fontSize: 14, opacity: 0.5, marginTop: 4 }}>{[selectedCard.year, selectedCard.brand, selectedCard.set].filter(Boolean).join(" · ")}</div></div>
                 {selectedCard.manualValue && <div style={{ background: t.accentBg, color: t.accent, padding: "8px 16px", borderRadius: 10, fontWeight: 800, fontSize: 22 }}>{fmt(selectedCard.manualValue)}</div>}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16, marginTop: 20 }}>
@@ -529,6 +529,7 @@ export default function CardVault() {
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         select { appearance: auto; }
+        option { background: ${t.surface}; color: ${t.text}; }
         input:focus, select:focus, textarea:focus { border-color: ${t.accent} !important; }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 6px; }
