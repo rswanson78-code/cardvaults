@@ -288,8 +288,8 @@ export default function CardVault() {
         </div>
         <div><label style={lbl}>{cardForm.category === "Pokémon" ? "Pokémon Name *" : "Player Name *"}</label><input value={cardForm.playerName} onChange={e => updateForm("playerName", e.target.value)} placeholder={cardForm.category === "Pokémon" ? "e.g. Charizard" : "e.g. Patrick Mahomes"} style={inp} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div><label style={lbl}>Brand</label><select value={cardForm.brand} onChange={e => updateForm("brand", e.target.value)} style={{ ...inp, cursor: "pointer" }}><option value="">Select...</option>{getBrands(cardForm.category).map(b => <option key={b} value={b}>{b}</option>)}</select></div>
-          <div><label style={lbl}>Set</label><select value={cardForm.set} onChange={e => updateForm("set", e.target.value)} style={{ ...inp, cursor: "pointer" }}><option value="">Select...</option>{getSets(cardForm.category).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+          <div><label style={lbl}>Brand</label><input list="brand-options" value={cardForm.brand} onChange={e => updateForm("brand", e.target.value)} placeholder="Select or type new..." style={{ ...inp }} /><datalist id="brand-options">{getBrands(cardForm.category).map(b => <option key={b} value={b} />)}</datalist></div>
+          <div><label style={lbl}>Set</label><input list="set-options" value={cardForm.set} onChange={e => updateForm("set", e.target.value)} placeholder="Select or type new..." style={{ ...inp }} /><datalist id="set-options">{getSets(cardForm.category).map(s => <option key={s} value={s} />)}</datalist></div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label style={lbl}>Variation / Parallel</label><input value={cardForm.variation} onChange={e => updateForm("variation", e.target.value)} placeholder="e.g. Silver, Green Pulsar" style={inp} /></div>
