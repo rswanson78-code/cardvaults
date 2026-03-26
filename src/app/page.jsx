@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, collection, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const GRADING_SCALES = {
@@ -125,24 +125,38 @@ export default function CardVault() {
   const skipSync = useRef(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "vault", "v1"), (dSnapshot) => {
+    const unsubMeta = onSnapshot(doc(db, "vault", "v1"), (dSnapshot) => {
       if (dSnapshot.exists()) {
         const d = dSnapshot.data();
         skipSync.current = true;
         if (d.profiles) setProfiles(d.profiles);
-        if (d.cards) setCards(d.cards);
         if (d.darkMode !== undefined) setDarkMode(d.darkMode);
+        
+        // Auto-migrate legacy cards array to subcollection
+        if (d.cards && d.cards.length > 0) {
+          d.cards.forEach(c => {
+            setDoc(doc(db, "vault", "v1", "cards", c.id), c).catch(console.error);
+          });
+          // Remove them from the main doc to free up space
+          setDoc(doc(db, "vault", "v1"), { profiles: d.profiles || [], darkMode: d.darkMode !== undefined ? d.darkMode : true }).catch(console.error);
+        }
+        
         setTimeout(() => { skipSync.current = false; }, 100);
       }
     });
-    return () => unsub();
+
+    const unsubCards = onSnapshot(collection(db, "vault", "v1", "cards"), (snapshot) => {
+      setCards(snapshot.docs.map(docSnap => docSnap.data()));
+    });
+
+    return () => { unsubMeta(); unsubCards(); };
   }, []);
 
   useEffect(() => {
     if (isInitialLoad.current) { isInitialLoad.current = false; return; }
     if (skipSync.current) return;
-    setDoc(doc(db, "vault", "v1"), { profiles, cards, darkMode }).catch(console.error);
-  }, [profiles, cards, darkMode]);
+    setDoc(doc(db, "vault", "v1"), { profiles, darkMode }).catch(console.error);
+  }, [profiles, darkMode]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
   const getBrands = (cat) => cat === "Pokémon" ? POKEMON_BRANDS : cat === "Football" ? FOOTBALL_BRANDS : OTHER_BRANDS;
@@ -176,18 +190,50 @@ export default function CardVault() {
     } else { showToast("Scan failed — fill in details manually."); }
   };
 
-  const handleSaveCard = () => {
+  const handleSaveCard = async () => {
     if (!cardForm.playerName.trim()) { showToast("Player/Character name is required"); return; }
     if (!cardForm.owner) { showToast("Please select an owner"); return; }
-    if (cardForm.id) { setCards(p => p.map(c => c.id === cardForm.id ? { ...cardForm } : c)); showToast("Card updated!"); }
-    else { setCards(p => [{ ...cardForm, id: uid(), dateAdded: new Date().toISOString() }, ...p]); showToast("Card added to the vault!"); }
+    
+    const cardData = cardForm.id ? { ...cardForm } : { ...cardForm, id: uid(), dateAdded: new Date().toISOString() };
+    
+    if (cardForm.id) { setCards(p => p.map(c => c.id === cardData.id ? cardData : c)); showToast("Card updated!"); }
+    else { setCards(p => [cardData, ...p]); showToast("Card added to the vault!"); }
+    
     setCardForm({ ...DEFAULT_CARD });
     if (activeProfile) setView("profile"); else setView("home");
+    
+    try {
+      await setDoc(doc(db, "vault", "v1", "cards", cardData.id), cardData);
+    } catch (err) {
+      console.error("Error saving card to cloud:", err);
+      showToast("Error saving card to cloud!");
+    }
   };
 
-  const handleDeleteCard = (id) => {
+  const handleDeleteCard = async (id) => {
     setCards(p => p.filter(c => c.id !== id)); setDeleteConfirm(null);
     if (activeProfile) setView("profile"); else setView("home"); showToast("Card removed.");
+    
+    try {
+      await deleteDoc(doc(db, "vault", "v1", "cards", id));
+    } catch (err) {
+      console.error("Error deleting card:", err);
+    }
+  };
+
+  const handleRenameProfile = (index, oldName, newName) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setProfiles(pr => pr.map((pp, ii) => (ii === index ? trimmed : pp)));
+    setCards(pr => pr.map(c => {
+      if (c.owner === oldName) {
+        const nc = { ...c, owner: trimmed };
+        setDoc(doc(db, "vault", "v1", "cards", nc.id), nc).catch(console.error);
+        return nc;
+      }
+      return c;
+    }));
+    setEditingProfile(null);
   };
 
   const getValueUrl = (card, src) => {
@@ -502,8 +548,8 @@ export default function CardVault() {
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, marginBottom: 10, borderLeft: `3px solid ${color}` }}>
                   {editingProfile === i ? (
                     <>
-                      <input value={editProfileName} onChange={e => setEditProfileName(e.target.value)} style={{ ...inp, flex: 1 }} autoFocus onKeyDown={e => { if (e.key === "Enter" && editProfileName.trim()) { const old = profiles[i]; setProfiles(pr => pr.map((pp, ii) => ii === i ? editProfileName.trim() : pp)); setCards(pr => pr.map(c => c.owner === old ? { ...c, owner: editProfileName.trim() } : c)); setEditingProfile(null); } }} />
-                      <button onClick={() => { if (editProfileName.trim()) { const old = profiles[i]; setProfiles(pr => pr.map((pp, ii) => ii === i ? editProfileName.trim() : pp)); setCards(pr => pr.map(c => c.owner === old ? { ...c, owner: editProfileName.trim() } : c)); setEditingProfile(null); } }} style={{ ...btnP, padding: "6px 12px" }}><I name="check" size={16} /></button>
+                      <input value={editProfileName} onChange={e => setEditProfileName(e.target.value)} style={{ ...inp, flex: 1 }} autoFocus onKeyDown={e => { if (e.key === "Enter") handleRenameProfile(i, profiles[i], editProfileName); }} />
+                      <button onClick={() => handleRenameProfile(i, profiles[i], editProfileName)} style={{ ...btnP, padding: "6px 12px" }}><I name="check" size={16} /></button>
                       <button onClick={() => setEditingProfile(null)} style={{ ...btnS, padding: "6px 12px" }}><I name="x" size={16} /></button>
                     </>
                   ) : (
