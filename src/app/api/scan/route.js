@@ -35,7 +35,20 @@ export async function POST(req) {
     const geminiPayload = {
       contents: [{ role: "user", parts }],
       generationConfig: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            playerName: { type: "STRING", description: "The name of the player on the card. If not found, return an empty string." },
+            brand: { type: "STRING", description: "The brand of the card (e.g., Topps, Panini). If not found, return an empty string." },
+            set: { type: "STRING", description: "The specific set. If not found, return an empty string." },
+            year: { type: "STRING", description: "The year the card was produced. If not found, return an empty string." },
+            cardNumber: { type: "STRING", description: "The card number. If not found, return an empty string." },
+            serialNumber: { type: "STRING", description: "The serial number, if applicable. If not found, return an empty string." },
+            estimatedCondition: { type: "STRING", description: "Visual estimation of card condition if possible. If not found, return an empty string." }
+          },
+          required: ["playerName", "brand", "set", "year", "cardNumber", "serialNumber", "estimatedCondition"]
+        }
       }
     };
 

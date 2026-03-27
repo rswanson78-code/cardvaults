@@ -45,3 +45,9 @@ next-env.d.ts
 
 # firebase
 .firebase
+
+# Visual Studio
+.vs/
+*.vsidx
+*.suo
+*.user
