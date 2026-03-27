@@ -45,10 +45,29 @@ const scanCardWithAI = async (frontImg, backImg, category) => {
     if (frontImg) { const b = frontImg.split(",")[1]; const m = frontImg.split(";")[0].split(":")[1] || "image/jpeg"; images.push({ type: "image", source: { type: "base64", media_type: m, data: b } }); images.push({ type: "text", text: "Above is the FRONT of the card." }); }
     if (backImg) { const b = backImg.split(",")[1]; const m = backImg.split(";")[0].split(":")[1] || "image/jpeg"; images.push({ type: "image", source: { type: "base64", media_type: m, data: b } }); images.push({ type: "text", text: "Above is the BACK of the card." }); }
     const prompt = `You are an expert ${category === "Pokémon" ? "Pokémon" : "sports"} card identifier. Analyze the card image(s) and extract information. Respond ONLY with a JSON object, no markdown, no backticks:\n{"playerName":"","brand":"","set":"","variation":"","year":"","cardNumber":"","serialNumber":"","estimatedCondition":""}\nIf you cannot determine a field, use empty string. Be specific.`;
+    
     const response = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category, prompt, images }) });
-    const data = await response.json(); const text = data.content?.map(i => i.text || "").join("") || "";
-    return JSON.parse(text.replace(/```json|```/g, "").trim());
-  } catch (err) { console.error("AI scan error:", err); return null; }
+    if (!response.ok) {
+      let errMsg = response.statusText;
+      try { const errData = await response.json(); if (errData.error) errMsg = errData.error; } catch(e) {}
+      console.error("Backend Error:", response.status, errMsg);
+      return { error: errMsg };
+    }
+    
+    const data = await response.json(); 
+    let text = data.content?.map(i => i.text || "").join("") || "";
+    
+    // Robust extraction: find the first { and the last }
+    const startIndex = text.indexOf('{');
+    const endIndex = text.lastIndexOf('}');
+    if (startIndex !== -1 && endIndex !== -1) {
+      text = text.substring(startIndex, endIndex + 1);
+    } else {
+      throw new Error("No JSON format detected in AI response.");
+    }
+    
+    return JSON.parse(text);
+  } catch (err) { console.error("AI scan error:", err); return { error: err.message || "Unknown scan error" }; }
 };
 
 const I = ({ name, size = 20 }) => {
@@ -184,10 +203,15 @@ export default function CardVault() {
     setScanning(true);
     const result = await scanCardWithAI(cardForm.frontImage, cardForm.backImage, cardForm.category);
     setScanning(false);
-    if (result) {
+    
+    if (result && result.error) {
+      showToast(`Scan failed: ${result.error}`);
+    } else if (result) {
       setCardForm(p => ({ ...p, playerName: result.playerName || p.playerName, brand: result.brand || p.brand, set: result.set || p.set, variation: result.variation || p.variation, year: result.year || p.year, cardNumber: result.cardNumber || p.cardNumber, serialNumber: result.serialNumber || p.serialNumber, rawCondition: result.estimatedCondition || p.rawCondition }));
       showToast("Card scanned! Review the details below.");
-    } else { showToast("Scan failed — fill in details manually."); }
+    } else { 
+      showToast("Scan failed — fill in details manually."); 
+    }
   };
 
   const handleSaveCard = async () => {
