@@ -6,14 +6,7 @@ export async function POST(req) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey || apiKey === "YOUR_API_KEY_HERE") {
-      return NextResponse.json({ 
-        content: [{ text: JSON.stringify({
-          playerName: "Error: Missing API Key",
-          brand: "Check .env.local",
-          set: "Add GEMINI_API_KEY",
-          variation: "", year: "", cardNumber: "", serialNumber: "", estimatedCondition: ""
-        }) }] 
-      }, { status: 200 }); // Return 200 so UI shows error text nicely without crashing
+      return NextResponse.json({ error: "Missing GEMINI_API_KEY in environment variables." }, { status: 500 });
     }
 
     // Convert Anthropic structure to Gemini structure
@@ -62,9 +55,7 @@ export async function POST(req) {
     
     if (!res.ok) {
         console.error("Google AI Error:", data);
-        return NextResponse.json({
-          content: [{ text: JSON.stringify({ playerName: "API Error", brand: data.error?.message || "Unknown error" }) }]
-        }, { status: 200 });
+        return NextResponse.json({ error: data.error?.message || "Unknown error from Google AI" }, { status: 500 });
     }
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
@@ -76,8 +67,6 @@ export async function POST(req) {
 
   } catch (error) {
     console.error("Scan Server Error:", error);
-    return NextResponse.json({
-      content: [{ text: JSON.stringify({ playerName: "Server Error", brand: error.message }) }]
-    }, { status: 200 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
