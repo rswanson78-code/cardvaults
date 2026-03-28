@@ -503,6 +503,7 @@ export default function CardVault() {
         {/* --- CARD DETAIL --- */}
         {view === "cardDetail" && selectedCard && (() => {
           const isMine = selectedCard.userId === user.uid;
+          const isOrphan = !selectedCard.userId;
           return (
           <div style={{ animation: "fadeIn 0.4s ease", paddingTop: 20 }}>
             {(selectedCard.frontImage || selectedCard.backImage) && (
@@ -539,6 +540,23 @@ export default function CardVault() {
                     <button onClick={() => setDeleteConfirm(null)} style={{ ...btnS, borderRadius: 14 }}>Cancel</button>
                   </div>
                 ) : <button onClick={() => setDeleteConfirm(selectedCard.id)} style={{ ...btnS, color: t.danger, borderRadius: 14 }}><I name="trash" size={16} /></button>}
+              </div>
+            )}
+            {isOrphan && (
+              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                <button 
+                  onClick={async () => {
+                    const claimedCard = { ...selectedCard, userId: user.uid, owner: user.email.split('@')[0] };
+                    try {
+                      await setDoc(doc(db, "vault", "v1", "cards", claimedCard.id), claimedCard);
+                      setCards(p => p.map(c => c.id === claimedCard.id ? claimedCard : c));
+                      setSelectedCard(claimedCard);
+                      showToast("Legacy Card Officially Claimed!");
+                    } catch (e) { showToast("Failed to claim card."); }
+                  }} 
+                  style={{ ...btnP, flex: 1, justifyContent: "center", borderRadius: 14, background: t.green, color: "#fff" }}>
+                  <I name="check" size={16} /> Claim This Legacy Card
+                </button>
               </div>
             )}
           </div>
