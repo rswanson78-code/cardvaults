@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { doc, setDoc, onSnapshot, collection, deleteDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { db, auth } from "@/lib/firebase";
 
 const GRADING_SCALES = {
   PSA: ["10 Gem Mint","9 Mint","8 NM-MT","7 NM","6 EX-MT","5 EX","4 VG-EX","3 VG","2 Good","1.5 Fair","1 Poor"],
@@ -17,7 +18,7 @@ const OTHER_SETS = ["Chrome","Prizm","Mosaic","Select","Optic","Donruss","Bowman
 const CATEGORIES = ["Football","Pokémon","Basketball","Baseball","Soccer","Hockey","Other"];
 
 const DEFAULT_CARD = {
-  id: "", owner: "", category: "Football", playerName: "", brand: "", set: "", variation: "",
+  id: "", owner: "", userId: "", category: "Football", playerName: "", brand: "", set: "", variation: "",
   year: new Date().getFullYear().toString(), cardNumber: "", serialNumber: "", isGraded: false,
   gradingCompany: "PSA", grade: "", certNumber: "", rawCondition: "", frontImage: null, backImage: null,
   manualValue: "", notes: "", dateAdded: "",
@@ -25,9 +26,6 @@ const DEFAULT_CARD = {
 
 const PROFILE_COLORS = ["#c9a34f","#5b8def","#e0574f","#43b88c","#b06de4","#e8923b","#4dd4d4","#d4699e"];
 
-const STORAGE_KEY = "card-vault-data";
-const loadData = () => { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; } };
-const saveData = (d) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {} };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const fmt = (v) => { const n = parseFloat(v); return isNaN(n) ? "$0.00" : "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 const toBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
@@ -57,7 +55,6 @@ const scanCardWithAI = async (frontImg, backImg, category) => {
     const data = await response.json(); 
     let text = data.content?.map(i => i.text || "").join("") || "";
     
-    // Robust extraction: find the first { and the last }
     const startIndex = text.indexOf('{');
     const endIndex = text.lastIndexOf('}');
     if (startIndex !== -1 && endIndex !== -1) {
@@ -86,7 +83,8 @@ const I = ({ name, size = 20 }) => {
     ext: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
     cards: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="4" width="14" height="18" rx="2"/><path d="M18 8h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/></svg>,
     scan: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
-    settings: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+    logout: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+    user: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
     allCards: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
   };
   return d[name] || null;
@@ -123,9 +121,16 @@ const ImageUpload = ({ label, image, onImage, darkMode }) => {
 
 export default function CardVault() {
   const [darkMode, setDarkMode] = useState(true);
+  
+  // Auth State
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+
   const [view, setView] = useState("home");
-  const [activeProfile, setActiveProfile] = useState(null);
-  const [profiles, setProfiles] = useState(["Dad", "Son 1", "Son 2"]);
   const [cards, setCards] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [filterCategory, setFilterCategory] = useState("All");
@@ -133,70 +138,73 @@ export default function CardVault() {
   const [sortBy, setSortBy] = useState("dateAdded");
   const [cardForm, setCardForm] = useState({ ...DEFAULT_CARD });
   const [scanning, setScanning] = useState(false);
-  const [newProfileName, setNewProfileName] = useState("");
-  const [editingProfile, setEditingProfile] = useState(null);
-  const [editProfileName, setEditProfileName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [toast, setToast] = useState(null);
   const [prevView, setPrevView] = useState("home");
 
   const isInitialLoad = useRef(true);
-  const skipSync = useRef(false);
 
+  // Handle Authentication Tracking
   useEffect(() => {
-    const unsubMeta = onSnapshot(doc(db, "vault", "v1"), (dSnapshot) => {
-      if (dSnapshot.exists()) {
-        const d = dSnapshot.data();
-        skipSync.current = true;
-        if (d.profiles) setProfiles(d.profiles);
-        if (d.darkMode !== undefined) setDarkMode(d.darkMode);
-        
-        // Auto-migrate legacy cards array to subcollection
-        if (d.cards && d.cards.length > 0) {
-          d.cards.forEach(c => {
-            setDoc(doc(db, "vault", "v1", "cards", c.id), c).catch(console.error);
-          });
-          // Remove them from the main doc to free up space
-          setDoc(doc(db, "vault", "v1"), { profiles: d.profiles || [], darkMode: d.darkMode !== undefined ? d.darkMode : true }).catch(console.error);
-        }
-        
-        setTimeout(() => { skipSync.current = false; }, 100);
-      }
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
     });
+    return () => unsub();
+  }, []);
 
+  // Handle Global Cards Sync
+  useEffect(() => {
+    if (!user) {
+      setCards([]);
+      return;
+    }
     const unsubCards = onSnapshot(collection(db, "vault", "v1", "cards"), (snapshot) => {
       setCards(snapshot.docs.map(docSnap => docSnap.data()));
     });
-
-    return () => { unsubMeta(); unsubCards(); };
-  }, []);
-
-  useEffect(() => {
-    if (isInitialLoad.current) { isInitialLoad.current = false; return; }
-    if (skipSync.current) return;
-    setDoc(doc(db, "vault", "v1"), { profiles, darkMode }).catch(console.error);
-  }, [profiles, darkMode]);
+    return () => unsubCards();
+  }, [user]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
   const getBrands = (cat) => cat === "Pokémon" ? POKEMON_BRANDS : cat === "Football" ? FOOTBALL_BRANDS : OTHER_BRANDS;
   const getSets = (cat) => cat === "Pokémon" ? POKEMON_SETS : cat === "Football" ? FOOTBALL_SETS : OTHER_SETS;
   const updateForm = (k, v) => setCardForm(p => ({ ...p, [k]: v }));
-  const profileColor = (name) => PROFILE_COLORS[profiles.indexOf(name) % PROFILE_COLORS.length];
+  const profileColor = (name) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return PROFILE_COLORS[Math.abs(hash) % PROFILE_COLORS.length];
+  };
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    try {
+      if (authMode === "login") {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
 
   const goBack = () => {
     if (view === "cardDetail" || view === "addCard" || view === "editCard") {
       setCardForm({ ...DEFAULT_CARD }); setDeleteConfirm(null);
-      if (activeProfile) setView("profile"); else if (prevView === "allCards") setView("allCards"); else setView("home");
-    } else if (view === "profile" || view === "allCards" || view === "manageProfiles") {
-      setView("home"); setActiveProfile(null); setFilterCategory("All"); setSearchTerm("");
-    } else { setView("home"); }
+      if (prevView) setView(prevView); else setView("home");
+    } else { 
+      setView("home"); setFilterCategory("All"); setSearchTerm("");
+    }
   };
 
-  const openProfile = (name) => { setActiveProfile(name); setFilterCategory("All"); setSearchTerm(""); setSortBy("dateAdded"); setView("profile"); };
-  const openAllCards = () => { setActiveProfile(null); setFilterCategory("All"); setSearchTerm(""); setSortBy("dateAdded"); setPrevView("allCards"); setView("allCards"); };
+  const openMyCards = () => { setFilterCategory("All"); setSearchTerm(""); setSortBy("dateAdded"); setPrevView("home"); setView("myCards"); };
+  const openAllCards = () => { setFilterCategory("All"); setSearchTerm(""); setSortBy("dateAdded"); setPrevView("home"); setView("allCards"); };
   const openDetail = (card) => { setSelectedCard(card); setPrevView(view); setView("cardDetail"); };
   const openEdit = (card) => { setCardForm({ ...card }); setView("editCard"); };
-  const openAddCard = (owner) => { setCardForm({ ...DEFAULT_CARD, owner: owner || "" }); setView("addCard"); };
+  const openAddCard = () => { setCardForm({ ...DEFAULT_CARD, owner: user.email.split('@')[0], userId: user.uid }); setPrevView(view); setView("addCard"); };
 
   const handleScan = async () => {
     if (!cardForm.frontImage && !cardForm.backImage) { showToast("Upload at least one image to scan"); return; }
@@ -216,15 +224,16 @@ export default function CardVault() {
 
   const handleSaveCard = async () => {
     if (!cardForm.playerName.trim()) { showToast("Player/Character name is required"); return; }
-    if (!cardForm.owner) { showToast("Please select an owner"); return; }
     
-    const cardData = cardForm.id ? { ...cardForm } : { ...cardForm, id: uid(), dateAdded: new Date().toISOString() };
+    const cardData = cardForm.id ? { ...cardForm } : { ...cardForm, id: uid(), dateAdded: new Date().toISOString(), userId: user.uid, owner: user.email.split('@')[0] };
     
+    // Optimistic UI Update
     if (cardForm.id) { setCards(p => p.map(c => c.id === cardData.id ? cardData : c)); showToast("Card updated!"); }
     else { setCards(p => [cardData, ...p]); showToast("Card added to the vault!"); }
     
+    const targetView = prevView || "home";
     setCardForm({ ...DEFAULT_CARD });
-    if (activeProfile) setView("profile"); else setView("home");
+    setView(targetView);
     
     try {
       await setDoc(doc(db, "vault", "v1", "cards", cardData.id), cardData);
@@ -236,28 +245,12 @@ export default function CardVault() {
 
   const handleDeleteCard = async (id) => {
     setCards(p => p.filter(c => c.id !== id)); setDeleteConfirm(null);
-    if (activeProfile) setView("profile"); else setView("home"); showToast("Card removed.");
-    
+    setView(prevView || "home"); showToast("Card removed.");
     try {
       await deleteDoc(doc(db, "vault", "v1", "cards", id));
     } catch (err) {
       console.error("Error deleting card:", err);
     }
-  };
-
-  const handleRenameProfile = (index, oldName, newName) => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    setProfiles(pr => pr.map((pp, ii) => (ii === index ? trimmed : pp)));
-    setCards(pr => pr.map(c => {
-      if (c.owner === oldName) {
-        const nc = { ...c, owner: trimmed };
-        setDoc(doc(db, "vault", "v1", "cards", nc.id), nc).catch(console.error);
-        return nc;
-      }
-      return c;
-    }));
-    setEditingProfile(null);
   };
 
   const getValueUrl = (card, src) => {
@@ -266,12 +259,13 @@ export default function CardVault() {
     return `https://130point.com/sales/?search=${encodeURIComponent(q)}`;
   };
 
-  const contextCards = (activeProfile ? cards.filter(c => c.owner === activeProfile) : cards)
+  const contextCards = (view === "myCards" ? cards.filter(c => c.userId === user?.uid) : cards)
     .filter(c => { if (filterCategory !== "All" && c.category !== filterCategory) return false; if (searchTerm) { const s = searchTerm.toLowerCase(); return [c.playerName, c.brand, c.set, c.variation, c.year, c.notes].some(f => (f || "").toLowerCase().includes(s)); } return true; })
     .sort((a, b) => { if (sortBy === "dateAdded") return new Date(b.dateAdded) - new Date(a.dateAdded); if (sortBy === "name") return (a.playerName || "").localeCompare(b.playerName || ""); if (sortBy === "value") return (parseFloat(b.manualValue) || 0) - (parseFloat(a.manualValue) || 0); if (sortBy === "year") return (b.year || "").localeCompare(a.year || ""); return 0; });
 
   const totalValue = cards.reduce((s, c) => s + (parseFloat(c.manualValue) || 0), 0);
-  const getOwnerStats = (name) => { const oc = cards.filter(c => c.owner === name); return { count: oc.length, value: oc.reduce((s, c) => s + (parseFloat(c.manualValue) || 0), 0), categories: [...new Set(oc.map(c => c.category))] }; };
+  const myCardsList = cards.filter(c => c.userId === user?.uid);
+  const myTotalValue = myCardsList.reduce((s, c) => s + (parseFloat(c.manualValue) || 0), 0);
 
   const t = {
     bg: darkMode ? "#0f1117" : "#f4f2ef", surface: darkMode ? "#1a1d27" : "#ffffff",
@@ -286,13 +280,40 @@ export default function CardVault() {
   const lbl = { display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.05em" };
   const chip = (a) => ({ padding: "6px 14px", borderRadius: 20, border: `1px solid ${a ? t.accent : t.border}`, background: a ? t.accentBg : "transparent", color: a ? t.accent : t.textMuted, cursor: "pointer", fontSize: 13, fontWeight: a ? 700 : 500, whiteSpace: "nowrap" });
 
+  if (authLoading) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: t.bg, color: t.text }}>Loading Vault...</div>;
+
+  if (!user) {
+    return (
+      <div style={{ fontFamily: "'Outfit', 'DM Sans', sans-serif", background: t.bg, color: t.text, minHeight: "100vh", display: "flex", alignItems: "center", justifyItems: "center", flexDirection: "column", paddingTop: "10vh" }}>
+        <h1 style={{ margin: "0 0 40px", fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em" }}>
+          <span style={{ color: t.accent }}>THE</span> CARD VAULT
+        </h1>
+        <div style={{ background: t.surface, padding: 32, borderRadius: 16, border: `1px solid ${t.border}`, width: "100%", maxWidth: 400 }}>
+          <h2 style={{ margin: "0 0 20px", fontSize: 24, fontWeight: 800 }}>{authMode === "login" ? "Welcome Back" : "Create Account"}</h2>
+          <form onSubmit={handleAuth} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div><label style={lbl}>Email Address</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={inp} /></div>
+            <div><label style={lbl}>Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={inp} /></div>
+            {authError && <div style={{ color: t.danger, fontSize: 13, background: "rgba(217,68,68,0.1)", padding: 10, borderRadius: 8 }}>{authError}</div>}
+            <button type="submit" style={{ ...btnP, justifyContent: "center", padding: 14 }}>{authMode === "login" ? "Sign In" : "Register"}</button>
+          </form>
+          <div style={{ marginTop: 20, textAlign: "center", fontSize: 14 }}>
+            <span style={{ opacity: 0.6 }}>{authMode === "login" ? "Don't have an account? " : "Already have an account? "}</span>
+            <span style={{ color: t.accent, cursor: "pointer", fontWeight: 700 }} onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setAuthError(""); }}>
+              {authMode === "login" ? "Sign Up" : "Log In"}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const CardGrid = ({ cardList, emptyMsg }) => (
     cardList.length === 0 ? (
       <div style={{ textAlign: "center", padding: "50px 20px", opacity: 0.4 }}><I name="cards" size={44} /><p style={{ marginTop: 10, fontSize: 15, fontWeight: 500 }}>{emptyMsg}</p></div>
     ) : (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
         {cardList.map(card => (
-          <div key={card.id} onClick={() => openDetail(card)} style={{ background: t.surface, borderRadius: 14, border: `1px solid ${t.border}`, overflow: "hidden", cursor: "pointer" }}>
+          <div key={card.id} onClick={() => openDetail(card)} style={{ background: t.surface, borderRadius: 14, border: `1px solid ${t.border}`, overflow: "hidden", cursor: "pointer", position: "relative" }}>
             {card.frontImage ? (
               <div style={{ height: 170, overflow: "hidden", background: darkMode ? "#111" : "#eee", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <img src={card.frontImage} alt={card.playerName} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
@@ -311,7 +332,7 @@ export default function CardVault() {
               {card.variation && <div style={{ fontSize: 12, color: t.accent, fontWeight: 600, marginTop: 4 }}>{card.variation}</div>}
               <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: t.accentBg, color: t.textMuted, fontWeight: 600 }}>{card.category}</span>
-                {!activeProfile && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${profileColor(card.owner)}22`, color: profileColor(card.owner), fontWeight: 600 }}>{card.owner}</span>}
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${profileColor(card.owner || "Unknown")}22`, color: profileColor(card.owner || "Unknown"), fontWeight: 600 }}>{card.owner || "Unknown"}</span>
                 {card.isGraded && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: "rgba(58,173,95,0.15)", color: t.green, fontWeight: 600 }}>{card.gradingCompany} {card.grade}</span>}
                 {card.serialNumber && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: "rgba(217,68,68,0.12)", color: "#e86464", fontWeight: 600 }}>#{card.serialNumber}</span>}
               </div>
@@ -342,7 +363,7 @@ export default function CardVault() {
 
   const CardForm = ({ isEdit }) => (
     <div style={{ animation: "fadeIn 0.4s ease", paddingTop: 20 }}>
-      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isEdit ? "Edit Card" : "Add New Card"}{activeProfile && !isEdit ? ` — ${activeProfile}` : ""}</h2>
+      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>{isEdit ? "Edit Card" : "Add New Card"}</h2>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
         <ImageUpload label="Front of Card" image={cardForm.frontImage} onImage={img => updateForm("frontImage", img)} darkMode={darkMode} />
         <ImageUpload label="Back of Card" image={cardForm.backImage} onImage={img => updateForm("backImage", img)} darkMode={darkMode} />
@@ -352,10 +373,7 @@ export default function CardVault() {
       </button>
       {scanning && <div style={{ textAlign: "center", padding: "0 0 16px", fontSize: 13, opacity: 0.5 }}>Analyzing with AI vision — a few seconds...</div>}
       <div style={{ display: "grid", gap: 14 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div><label style={lbl}>Owner *</label><select value={cardForm.owner} onChange={e => updateForm("owner", e.target.value)} style={{ ...inp, cursor: "pointer" }}><option value="">Select owner...</option>{profiles.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-          <div><label style={lbl}>Category</label><select value={cardForm.category} onChange={e => updateForm("category", e.target.value)} style={{ ...inp, cursor: "pointer" }}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-        </div>
+        <div><label style={lbl}>Category</label><select value={cardForm.category} onChange={e => updateForm("category", e.target.value)} style={{ ...inp, cursor: "pointer" }}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
         <div><label style={lbl}>{cardForm.category === "Pokémon" ? "Pokémon Name *" : "Player Name *"}</label><input value={cardForm.playerName} onChange={e => updateForm("playerName", e.target.value)} placeholder={cardForm.category === "Pokémon" ? "e.g. Charizard" : "e.g. Patrick Mahomes"} style={inp} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label style={lbl}>Brand</label><input list="brand-options" value={cardForm.brand} onChange={e => updateForm("brand", e.target.value)} placeholder="Select or type new..." style={{ ...inp }} /><datalist id="brand-options">{getBrands(cardForm.category).map(b => <option key={b} value={b} />)}</datalist></div>
@@ -410,109 +428,69 @@ export default function CardVault() {
       <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${t.border}`, background: t.surface, position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {view !== "home" && <button onClick={goBack} style={{ ...btnS, padding: "6px 10px", border: "none" }}><I name="back" size={20} /></button>}
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", cursor: "pointer" }} onClick={() => { setView("home"); setActiveProfile(null); }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", cursor: "pointer" }} onClick={() => setView("home")}>
             <span style={{ color: t.accent }}>THE</span> CARD VAULT
           </h1>
-          {activeProfile && (view === "profile" || view === "addCard" || view === "editCard") && <span style={{ fontSize: 14, opacity: 0.5, fontWeight: 500 }}>/ {activeProfile}</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 13, marginRight: 8, opacity: 0.7, display: "flex", alignItems: "center", gap: 6 }}>
+            <I name="user" size={14} /> {user.email.split('@')[0]}
+          </span>
           <button onClick={() => setDarkMode(!darkMode)} style={{ ...btnS, padding: 8, border: "none" }}><I name={darkMode ? "sun" : "moon"} size={18} /></button>
-          <button onClick={() => setView("manageProfiles")} style={{ ...btnS, padding: 8, border: "none" }}><I name="settings" size={18} /></button>
+          <button onClick={() => signOut(auth)} style={{ ...btnS, padding: 8, border: "none", color: t.danger }}><I name="logout" size={18} /></button>
         </div>
       </div>
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 16px 100px" }}>
 
-        {/* â•â•â• HOME â•â•â• */}
+        {/* --- HOME --- */}
         {view === "home" && (
           <div style={{ animation: "fadeIn 0.4s ease" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "20px 0" }}>
               <div style={{ background: t.surface, borderRadius: 14, padding: "16px 18px", border: `1px solid ${t.border}` }}>
-                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Total Cards</div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: t.accent, marginTop: 2 }}>{cards.length}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Global Master Vault</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 4 }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: t.accent }}>{cards.length}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: t.green }}>{fmt(totalValue)}</div>
+                </div>
               </div>
-              <div style={{ background: t.surface, borderRadius: 14, padding: "16px 18px", border: `1px solid ${t.border}` }}>
-                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Total Value</div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: t.green, marginTop: 2 }}>{fmt(totalValue)}</div>
+              <div onClick={openMyCards} style={{ background: t.surface, borderRadius: 14, padding: "16px 18px", border: `1px solid ${t.border}`, cursor: "pointer", borderLeft: `4px solid ${t.accent}` }}>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>My Collection</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 4 }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: t.text }}>{myCardsList.length}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: t.green }}>{fmt(myTotalValue)}</div>
+                </div>
               </div>
-            </div>
-
-            <h2 style={{ margin: "28px 0 14px", fontSize: 17, fontWeight: 700, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.04em" }}>Collectors</h2>
-            <div style={{ display: "grid", gap: 12 }}>
-              {profiles.map(name => {
-                const stats = getOwnerStats(name);
-                const color = profileColor(name);
-                const recent = cards.filter(c => c.owner === name).sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded)).slice(0, 4);
-                return (
-                  <div key={name} onClick={() => openProfile(name)} style={{ background: t.surface, borderRadius: 16, border: `1px solid ${t.border}`, padding: 20, cursor: "pointer", transition: "all 0.2s", borderLeft: `4px solid ${color}` }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: recent.length > 0 ? 12 : 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 12, background: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color }}>{name.charAt(0).toUpperCase()}</div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 18 }}>{name}</div>
-                          <div style={{ fontSize: 13, opacity: 0.5 }}>{stats.count} card{stats.count !== 1 ? "s" : ""}{stats.categories.length > 0 && ` · ${stats.categories.join(", ")}`}</div>
-                        </div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 22, fontWeight: 800, color: t.green }}>{fmt(stats.value)}</div>
-                        <div style={{ fontSize: 11, opacity: 0.4, textTransform: "uppercase", fontWeight: 600 }}>Value</div>
-                      </div>
-                    </div>
-                    {recent.length > 0 && (
-                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                        {recent.map(c => (
-                          <div key={c.id} style={{ width: 52, height: 72, borderRadius: 8, overflow: "hidden", background: darkMode ? "#111" : "#eee", border: `1px solid ${t.border}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {c.frontImage ? <img src={c.frontImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <I name="cards" size={16} />}
-                          </div>
-                        ))}
-                        {stats.count > 4 && <div style={{ width: 52, height: 72, borderRadius: 8, background: t.accentBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: t.accent, flexShrink: 0 }}>+{stats.count - 4}</div>}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 20 }}>
-              <button onClick={openAllCards} style={{ ...btnS, justifyContent: "center", padding: "16px", borderRadius: 14, fontSize: 15 }}><I name="allCards" size={18} /> All Cards</button>
-              <button onClick={() => openAddCard("")} style={{ ...btnP, justifyContent: "center", padding: "16px", borderRadius: 14, fontSize: 15 }}><I name="plus" size={18} /> Add Card</button>
+              <button onClick={openAllCards} style={{ ...btnS, justifyContent: "center", padding: "16px", borderRadius: 14, fontSize: 15 }}><I name="allCards" size={18} /> Global Vault View</button>
+              <button onClick={() => openAddCard()} style={{ ...btnP, justifyContent: "center", padding: "16px", borderRadius: 14, fontSize: 15 }}><I name="plus" size={18} /> Add New Card</button>
             </div>
+            
+            <h2 style={{ margin: "28px 0 14px", fontSize: 17, fontWeight: 700, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.04em" }}>Recently Added Globally</h2>
+            {CardGrid({ cardList: cards.sort((a,b) => new Date(b.dateAdded) - new Date(a.dateAdded)).slice(0, 4), emptyMsg: "No cards in the vault yet" })}
           </div>
         )}
 
-        {/* â•â•â• PROFILE PAGE â•â•â• */}
-        {view === "profile" && activeProfile && (() => {
-          const stats = getOwnerStats(activeProfile);
-          const color = profileColor(activeProfile);
-          return (
-            <div style={{ animation: "fadeIn 0.4s ease" }}>
-              <div style={{ background: t.surface, borderRadius: 16, border: `1px solid ${t.border}`, padding: 20, marginTop: 20, borderLeft: `4px solid ${color}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 50, height: 50, borderRadius: 14, background: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800, color }}>{activeProfile.charAt(0).toUpperCase()}</div>
-                    <div><div style={{ fontWeight: 800, fontSize: 22 }}>{activeProfile}</div><div style={{ fontSize: 13, opacity: 0.5 }}>{stats.count} card{stats.count !== 1 ? "s" : ""} in collection</div></div>
-                  </div>
-                  <div style={{ textAlign: "right" }}><div style={{ fontSize: 26, fontWeight: 800, color: t.green }}>{fmt(stats.value)}</div><div style={{ fontSize: 11, opacity: 0.4, textTransform: "uppercase", fontWeight: 600 }}>Collection Value</div></div>
-                </div>
-                {stats.categories.length > 0 && (
-                  <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                    {CATEGORIES.map(cat => { const n = cards.filter(c => c.owner === activeProfile && c.category === cat).length; if (!n) return null; return <span key={cat} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8, background: t.accentBg, color: t.textMuted, fontWeight: 600 }}>{cat}: {n}</span>; })}
-                  </div>
-                )}
-              </div>
-              <button onClick={() => openAddCard(activeProfile)} style={{ ...btnP, width: "100%", justifyContent: "center", padding: "14px 20px", fontSize: 15, marginTop: 16, marginBottom: 16, borderRadius: 14 }}><I name="plus" size={18} /> Add Card for {activeProfile}</button>
-              {FilterBar()}
-              {CardGrid({ cardList: contextCards, emptyMsg: `${activeProfile} hasn't added any cards yet.` })}
+        {/* --- MY CARDS --- */}
+        {view === "myCards" && (
+          <div style={{ animation: "fadeIn 0.4s ease", paddingTop: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>My Collection ({myCardsList.length})</h2>
+              <button onClick={() => openAddCard()} style={btnP}><I name="plus" size={16} /> Add Card</button>
             </div>
-          );
-        })()}
+            {FilterBar()}
+            {CardGrid({ cardList: contextCards, emptyMsg: "You haven't added any cards yet." })}
+          </div>
+        )}
 
-        {/* â•â•â• ALL CARDS â•â•â• */}
+        {/* --- ALL CARDS --- */}
         {view === "allCards" && (
           <div style={{ animation: "fadeIn 0.4s ease", paddingTop: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>All Cards ({cards.length})</h2>
-              <button onClick={() => openAddCard("")} style={btnP}><I name="plus" size={16} /> Add Card</button>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Global Vault ({cards.length})</h2>
+              <button onClick={() => openAddCard()} style={btnP}><I name="plus" size={16} /> Add Card</button>
             </div>
             {FilterBar()}
             {CardGrid({ cardList: contextCards, emptyMsg: "No cards match your filters." })}
@@ -522,8 +500,10 @@ export default function CardVault() {
         {view === "addCard" && CardForm({ isEdit: false })}
         {view === "editCard" && CardForm({ isEdit: true })}
 
-        {/* â•â•â• CARD DETAIL â•â•â• */}
-        {view === "cardDetail" && selectedCard && (
+        {/* --- CARD DETAIL --- */}
+        {view === "cardDetail" && selectedCard && (() => {
+          const isMine = selectedCard.userId === user.uid;
+          return (
           <div style={{ animation: "fadeIn 0.4s ease", paddingTop: 20 }}>
             {(selectedCard.frontImage || selectedCard.backImage) && (
               <div style={{ display: "flex", gap: 12, marginBottom: 20, justifyContent: "center", flexWrap: "wrap" }}>
@@ -531,7 +511,7 @@ export default function CardVault() {
                 {selectedCard.backImage && <div style={{ borderRadius: 14, overflow: "hidden", border: `1px solid ${t.border}`, maxWidth: 300 }}><img src={selectedCard.backImage} alt="Back" style={{ width: "100%", display: "block" }} /></div>}
               </div>
             )}
-            <div style={{ background: t.surface, borderRadius: 14, border: `1px solid ${t.border}`, padding: 20, marginBottom: 16, borderLeft: `4px solid ${profileColor(selectedCard.owner)}` }}>
+            <div style={{ background: t.surface, borderRadius: 14, border: `1px solid ${t.border}`, padding: 20, marginBottom: 16, borderLeft: `4px solid ${profileColor(selectedCard.owner || "Unknown")}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
                 <div><h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>{selectedCard.playerName}</h2><div style={{ fontSize: 14, opacity: 0.5, marginTop: 4 }}>{[selectedCard.year, selectedCard.brand, selectedCard.set].filter(Boolean).join(" · ")}</div></div>
                 {selectedCard.manualValue && <div style={{ background: t.accentBg, color: t.accent, padding: "8px 16px", borderRadius: 10, fontWeight: 800, fontSize: 22 }}>{fmt(selectedCard.manualValue)}</div>}
@@ -550,50 +530,20 @@ export default function CardVault() {
                 <a href={getValueUrl(selectedCard, "130point")} target="_blank" rel="noopener noreferrer" style={{ ...btnS, textDecoration: "none", color: t.text }}><I name="ext" size={14} /> 130point</a>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => openEdit(selectedCard)} style={{ ...btnP, flex: 1, justifyContent: "center", borderRadius: 14 }}><I name="edit" size={16} /> Edit Card</button>
-              {deleteConfirm === selectedCard.id ? (
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => handleDeleteCard(selectedCard.id)} style={{ ...btnS, color: t.danger, borderColor: t.danger, borderRadius: 14 }}>Confirm Delete</button>
-                  <button onClick={() => setDeleteConfirm(null)} style={{ ...btnS, borderRadius: 14 }}>Cancel</button>
-                </div>
-              ) : <button onClick={() => setDeleteConfirm(selectedCard.id)} style={{ ...btnS, color: t.danger, borderRadius: 14 }}><I name="trash" size={16} /></button>}
-            </div>
+            {isMine && (
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => openEdit(selectedCard)} style={{ ...btnP, flex: 1, justifyContent: "center", borderRadius: 14 }}><I name="edit" size={16} /> Edit Card</button>
+                {deleteConfirm === selectedCard.id ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => handleDeleteCard(selectedCard.id)} style={{ ...btnS, color: t.danger, borderColor: t.danger, borderRadius: 14 }}>Confirm Delete</button>
+                    <button onClick={() => setDeleteConfirm(null)} style={{ ...btnS, borderRadius: 14 }}>Cancel</button>
+                  </div>
+                ) : <button onClick={() => setDeleteConfirm(selectedCard.id)} style={{ ...btnS, color: t.danger, borderRadius: 14 }}><I name="trash" size={16} /></button>}
+              </div>
+            )}
           </div>
-        )}
-
-        {/* â•â•â• MANAGE PROFILES â•â•â• */}
-        {view === "manageProfiles" && (
-          <div style={{ animation: "fadeIn 0.4s ease", paddingTop: 20 }}>
-            <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 800 }}>Manage Collectors</h2>
-            {profiles.map((p, i) => {
-              const color = profileColor(p); const count = cards.filter(c => c.owner === p).length;
-              return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, marginBottom: 10, borderLeft: `3px solid ${color}` }}>
-                  {editingProfile === i ? (
-                    <>
-                      <input value={editProfileName} onChange={e => setEditProfileName(e.target.value)} style={{ ...inp, flex: 1 }} autoFocus onKeyDown={e => { if (e.key === "Enter") handleRenameProfile(i, profiles[i], editProfileName); }} />
-                      <button onClick={() => handleRenameProfile(i, profiles[i], editProfileName)} style={{ ...btnP, padding: "6px 12px" }}><I name="check" size={16} /></button>
-                      <button onClick={() => setEditingProfile(null)} style={{ ...btnS, padding: "6px 12px" }}><I name="x" size={16} /></button>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color, flexShrink: 0 }}>{p.charAt(0).toUpperCase()}</div>
-                      <div style={{ flex: 1, fontWeight: 600 }}>{p}</div>
-                      <span style={{ fontSize: 12, opacity: 0.4 }}>{count} cards</span>
-                      <button onClick={() => { setEditingProfile(i); setEditProfileName(p); }} style={{ ...btnS, padding: "6px 10px", border: "none" }}><I name="edit" size={16} /></button>
-                      <button onClick={() => { if (count > 0) showToast(`Remove all of ${p}'s cards first`); else setProfiles(pr => pr.filter((_, ii) => ii !== i)); }} style={{ ...btnS, padding: "6px 10px", border: "none", color: t.danger }}><I name="trash" size={16} /></button>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              <input value={newProfileName} onChange={e => setNewProfileName(e.target.value)} placeholder="New collector name..." style={{ ...inp, flex: 1 }} onKeyDown={e => { if (e.key === "Enter" && newProfileName.trim()) { setProfiles(p => [...p, newProfileName.trim()]); setNewProfileName(""); } }} />
-              <button onClick={() => { if (newProfileName.trim()) { setProfiles(p => [...p, newProfileName.trim()]); setNewProfileName(""); } }} style={btnP}><I name="plus" size={16} /> Add</button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       <style>{`
@@ -608,5 +558,3 @@ export default function CardVault() {
     </div>
   );
 }
-
-
